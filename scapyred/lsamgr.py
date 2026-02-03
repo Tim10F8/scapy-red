@@ -16,7 +16,6 @@ from scapy.layers.dcerpc import DCERPC_Transport, find_dcerpc_interface
 from scapy.layers.msrpce.rpcclient import DCERPC_Client
 
 from scapy.layers.windows.security import WINNT_SID
-from scapy.utils import AutoArgparse
 
 from scapy.layers.msrpce.raw.ms_lsad import (
     LsarAddAccountRights_Request,
@@ -151,18 +150,18 @@ def lsamgr(
             res = client.sr1_req(pkt)
             if (
                 not LsarEnumerateAccountsWithUserRight_Response in res
-                or res.status not in [0, 0x8000001a]
+                or res.status not in [0, 0x8000001A]
             ):
                 print("Failed :(")
                 res.show()
                 return
 
             results = []
-            if res.status != 0x8000001a:  # STATUS_NO_MORE_ENTRIES
+            if res.status != 0x8000001A:  # STATUS_NO_MORE_ENTRIES
                 for entry in res.valueof("EnumerationBuffer.Information"):
                     sid = WINNT_SID(bytes(entry.valueof("Sid")))
                     results.append(sid.summary())
-            
+
             results_rights.append((right, results))
 
         # Show results
@@ -170,7 +169,7 @@ def lsamgr(
             print("%s:" % right)
             for res in results:
                 print(f" - {res}")
-    
+
     elif action == "add":
         #####################
         ######## ADD ########
@@ -180,20 +179,15 @@ def lsamgr(
             PolicyHandle=policyHandle,
             AccountSid=PRPC_SID(bytes(WINNT_SID.fromstr(sid))),
             UserRights=PLSAPR_USER_RIGHT_SET(
-                UserRights=[
-                    PRPC_UNICODE_STRING(Buffer=right)
-                ]
-            )
+                UserRights=[PRPC_UNICODE_STRING(Buffer=right)]
+            ),
         )
 
         res = client.sr1_req(pkt)
-        if (
-            not LsarAddAccountRights_Response in res
-            or res.status != 0
-        ):
+        if not LsarAddAccountRights_Response in res or res.status != 0:
             return
         res.show()
-    
+
     elif action == "delete":
         #####################
         ###### DELETE #######
@@ -203,27 +197,26 @@ def lsamgr(
             PolicyHandle=policyHandle,
             AccountSid=PRPC_SID(bytes(WINNT_SID.fromstr(sid))),
             UserRights=PLSAPR_USER_RIGHT_SET(
-                UserRights=[
-                    PRPC_UNICODE_STRING(Buffer=right)
-                ]
-            )
+                UserRights=[PRPC_UNICODE_STRING(Buffer=right)]
+            ),
         )
         pkt.show2()
 
         res = client.sr1_req(pkt)
-        if (
-            not LsarRemoveAccountRights_Response in res
-            or res.status != 0
-        ):
+        if not LsarRemoveAccountRights_Response in res or res.status != 0:
             return
         res.show()
 
     client.sr1_req(LsarClose_Request(ObjectHandle=policyHandle))
 
+
 def main():
     """
     Main entry point
     """
+    from scapy.utils import AutoArgparse
+
+    conf.exts.load("scapy-red")
     AutoArgparse(lsamgr)
 
 
